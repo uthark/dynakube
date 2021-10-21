@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/fake"
@@ -142,6 +142,22 @@ func (c *Client) PrependReactor(verb string, resource string, action func(action
 	c.client.PrependReactor(verb, resource, action)
 }
 
+func (c *Client) AddObjects(objs ...runtime.Object) error {
+	objects, err := convertObjectsToUnstructured(c.scheme, objs)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, obj := range objects {
+		err := c.client.Tracker().Add(obj)
+		if err != nil { // untested section
+			return err
+		}
+
+	}
+	return nil
+}
+
 func getGVRFromObject(obj runtime.Object, scheme *runtime.Scheme) (schema.GroupVersionResource, error) {
 	// untested section
 	gvk, err := apiutil.GVKForObject(obj, scheme)
@@ -164,4 +180,42 @@ func (sw *fakeStatusWriter) Patch(ctx context.Context, obj client.Object, patch 
 func (sw *fakeStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	// TODO - support onl status update.
 	return sw.client.Update(ctx, obj)
+}
+
+func convertObjectsToUnstructured(s *runtime.Scheme, objs []runtime.Object) ([]runtime.Object, error) {
+	ul := make([]runtime.Object, 0, len(objs))
+
+	for _, obj := range objs {
+		u, err := convertToUnstructured(s, obj)
+		if err != nil {
+			return nil, err
+		}
+
+		ul = append(ul, u)
+	}
+	return ul, nil
+}
+
+func convertToUnstructured(s *runtime.Scheme, obj runtime.Object) (runtime.Object, error) {
+	var (
+		err error
+		u   unstructured.Unstructured
+	)
+
+	u.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil { // untested section
+		return nil, fmt.Errorf("failed to convert to unstructured: %w", err)
+	}
+
+	gvk := u.GroupVersionKind()
+	if gvk.Group == "" || gvk.Kind == "" {
+		gvks, _, err := s.ObjectKinds(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert to unstructured - unable to get GVK %w", err)
+		}
+		apiv, k := gvks[0].ToAPIVersionAndKind()
+		u.SetAPIVersion(apiv)
+		u.SetKind(k)
+	}
+	return &u, nil
 }

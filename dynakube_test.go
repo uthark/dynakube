@@ -2,6 +2,7 @@ package dynakube
 
 import (
 	"context"
+	v1 "k8s.io/api/apps/v1"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -138,6 +139,31 @@ var _ = Describe("Dynakube", func() {
 			})
 			c.Get(context.Background(), types.NamespacedName{}, &corev1.Pod{})
 			Expect(called).To(BeTrue())
+		})
+	})
+
+	Context("AddObjects", func() {
+		It("works", func() {
+			c = NewClient(customScheme)
+			err := c.AddObjects(&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+			})
+			Expect(err).To(BeNil())
+			actual := &corev1.Pod{}
+			err = c.Get(context.Background(), types.NamespacedName{Namespace: "test-ns", Name: "test"}, actual)
+			Expect(err).To(BeNil())
+			Expect(actual.Labels["foo"]).To(Equal("bar"))
+		})
+
+		It("fails on unregistered schema", func() {
+			c = NewClient(customScheme)
+			Expect(func() { c.AddObjects(&v1.Deployment{}) }).To(Panic())
 		})
 	})
 
