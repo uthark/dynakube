@@ -27,3 +27,6 @@ name := types.NamespacedName{Namespace: "test", Name: "foo"}
 _, err := r.Reconcile(context.Background(), controllers.Request{NamespacedName: name})
 Expect(err).ToNot(BeNil())
 ```
+
+## Notes
+This project reuses code from [k8s.io/client-go](https://github.com/kubernetes/client-go) package.
