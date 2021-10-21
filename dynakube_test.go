@@ -27,13 +27,20 @@ var _ = Describe("Dynakube", func() {
 	BeforeEach(func() {
 		customScheme = runtime.NewScheme()
 		corev1.AddToScheme(customScheme)
-		c = NewDynamicClient(customScheme)
+		c = NewClient(customScheme)
 		Expect(c).ToNot(BeNil())
+	})
+
+	Context("NewDynamicClient", func() {
+		It("works", func() {
+			dynamicClient := NewDynamicClient(customScheme)
+			Expect(dynamicClient).ToNot(BeNil())
+		})
 	})
 
 	Context("Get", func() {
 		It("returns object", func() {
-			c = NewDynamicClient(customScheme, stubPod())
+			c = NewClient(customScheme, stubPod())
 
 			pod := &corev1.Pod{}
 			err := c.Get(context.Background(), types.NamespacedName{
@@ -49,7 +56,7 @@ var _ = Describe("Dynakube", func() {
 	Context("Update", func() {
 		It("updates object", func() {
 			pod := stubPod()
-			c = NewDynamicClient(customScheme, pod)
+			c = NewClient(customScheme, pod)
 			err := c.Update(context.Background(), pod)
 			Expect(err).To(BeNil())
 
@@ -60,7 +67,7 @@ var _ = Describe("Dynakube", func() {
 
 		It("deletes object", func() {
 			pod := stubPod()
-			c = NewDynamicClient(customScheme, pod)
+			c = NewClient(customScheme, pod)
 			err := c.Delete(context.Background(), pod)
 			Expect(err).To(BeNil())
 
@@ -70,7 +77,7 @@ var _ = Describe("Dynakube", func() {
 	Context("List", func() {
 		It("Not implemented", func() {
 			pod := stubPod()
-			c = NewDynamicClient(customScheme, pod)
+			c = NewClient(customScheme, pod)
 			Expect(func() { c.List(context.Background(), &corev1.PodList{}) }).Should(Panic())
 		})
 
@@ -79,7 +86,7 @@ var _ = Describe("Dynakube", func() {
 	Context("Patch", func() {
 		It("patches objects", func() {
 			pod := stubPod()
-			c = NewDynamicClient(customScheme, pod)
+			c = NewClient(customScheme, pod)
 			err := c.Patch(context.Background(), pod, client.MergeFrom(pod))
 			Expect(err).To(BeNil())
 
@@ -89,7 +96,7 @@ var _ = Describe("Dynakube", func() {
 	Context("Create", func() {
 		It("works", func() {
 			pod := stubPod()
-			c = NewDynamicClient(customScheme)
+			c = NewClient(customScheme)
 			err := c.Create(context.Background(), pod)
 			Expect(err).To(BeNil())
 
@@ -98,7 +105,7 @@ var _ = Describe("Dynakube", func() {
 	Context("DeleteAllOf", func() {
 		It("Not implemented", func() {
 			pod := stubPod()
-			c = NewDynamicClient(customScheme, pod)
+			c = NewClient(customScheme, pod)
 			Expect(func() { c.DeleteAllOf(context.Background(), pod) }).Should(Panic())
 		})
 	})
@@ -106,7 +113,7 @@ var _ = Describe("Dynakube", func() {
 	Context("RESTMapper", func() {
 		It("Not implemented", func() {
 			pod := stubPod()
-			c = NewDynamicClient(customScheme, pod)
+			c = NewClient(customScheme, pod)
 			Expect(func() { c.RESTMapper() }).Should(Panic())
 
 		})
@@ -115,7 +122,7 @@ var _ = Describe("Dynakube", func() {
 	Context("Scheme", func() {
 		It("works", func() {
 			pod := stubPod()
-			c = NewDynamicClient(customScheme, pod)
+			c = NewClient(customScheme, pod)
 			Expect(c.Scheme()).ToNot(BeNil())
 
 		})
@@ -123,7 +130,7 @@ var _ = Describe("Dynakube", func() {
 
 	Context("PrependReactor", func() {
 		It("works", func() {
-			c = NewDynamicClient(customScheme)
+			c = NewClient(customScheme)
 			called := false
 			c.PrependReactor("*", "*", func(action testing2.Action) (handled bool, ret runtime.Object, err error) {
 				called = true
@@ -138,7 +145,7 @@ var _ = Describe("Dynakube", func() {
 		Context("Update", func() {
 			It("works", func() {
 				stub := stubPod()
-				c = NewDynamicClient(customScheme, stub)
+				c = NewClient(customScheme, stub)
 				stub.Labels = map[string]string{"foo": "bar"}
 				err := c.Status().Update(context.Background(), stub)
 				Expect(err).To(BeNil())
@@ -147,7 +154,7 @@ var _ = Describe("Dynakube", func() {
 		Context("Patch", func() {
 			It("works", func() {
 				pod := stubPod()
-				c = NewDynamicClient(customScheme, pod)
+				c = NewClient(customScheme, pod)
 				err := c.Status().Patch(context.Background(), pod, client.MergeFrom(pod))
 				Expect(err).To(BeNil())
 			})

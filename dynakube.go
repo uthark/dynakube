@@ -23,7 +23,11 @@ type Client struct {
 	scheme *runtime.Scheme
 }
 
+// DEPRECATED. Use NewClient
 func NewDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *Client {
+	return NewClient(scheme, objects...)
+}
+func NewClient(scheme *runtime.Scheme, objects ...runtime.Object) *Client {
 	dynamicClient := fake.NewSimpleDynamicClient(scheme, objects...)
 
 	return &Client{
