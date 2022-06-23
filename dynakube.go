@@ -174,12 +174,17 @@ type fakeStatusWriter struct {
 }
 
 func (sw *fakeStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	return sw.client.Patch(ctx, obj, patch, opts...)
+	data, err := patch.Data(obj)
+	if err != nil { // untested section
+		return err
+	}
+	action := testing.NewPatchSubresourceAction(schema.GroupVersionResource{}, obj.GetNamespace(), obj.GetName(), patch.Type(), data, "status")
+	return sw.client.invokeAction(action, obj)
 }
 
 func (sw *fakeStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	// TODO - support onl status update.
-	return sw.client.Update(ctx, obj)
+	action := testing.NewUpdateSubresourceAction(schema.GroupVersionResource{}, "status", obj.GetNamespace(), obj)
+	return sw.client.invokeAction(action, obj)
 }
 
 func convertObjectsToUnstructured(s *runtime.Scheme, objs []runtime.Object) ([]runtime.Object, error) {
