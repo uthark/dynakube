@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -49,7 +50,7 @@ func (c *Client) invokeAction(action testing.Action, obj client.Object) error {
 	case testing.GetActionImpl:
 		v.Resource = gvr
 		action = v
-	case *testing.PatchActionImpl:
+	case testing.PatchActionImpl:
 		v.Resource = gvr
 		action = v
 	case testing.DeleteActionImpl:
@@ -83,7 +84,7 @@ func (c *Client) Patch(ctx context.Context, obj client.Object, patch client.Patc
 		return err
 	}
 	action := testing.NewPatchAction(schema.GroupVersionResource{}, metaObj.GetNamespace(), obj.GetName(), patch.Type(), data)
-	return c.invokeAction(&action, obj)
+	return c.invokeAction(action, obj)
 }
 
 // DeleteAllOf ...
@@ -104,7 +105,7 @@ func (c *Client) RESTMapper() meta.RESTMapper {
 var _ client.Client = &Client{}
 
 // Get retrieves an obj for the given object key from the Kubernetes Cluster.
-func (c *Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+func (c *Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	action := testing.NewGetAction(schema.GroupVersionResource{}, key.Namespace, key.Name)
 	return c.invokeAction(action, obj)
 }
@@ -132,10 +133,17 @@ func (c *Client) Update(ctx context.Context, obj client.Object, opts ...client.U
 	return c.invokeAction(action, obj)
 }
 
+// SubResource ...
+func (c *Client) SubResource(subResource string) client.SubResourceClient {
+	return &fakeSubResourceClient{
+		client:      c,
+		subResource: subResource,
+	}
+}
+
 // Status returns fake status writer.
 func (c *Client) Status() client.StatusWriter {
-	// untested section
-	return &fakeStatusWriter{client: c}
+	return c.SubResource("status")
 }
 
 func (c *Client) PrependReactor(verb string, resource string, action func(action testing.Action) (handled bool, ret runtime.Object, err error)) {
@@ -169,21 +177,32 @@ func getGVRFromObject(obj runtime.Object, scheme *runtime.Scheme) (schema.GroupV
 	return gvr, nil
 }
 
-type fakeStatusWriter struct {
-	client *Client
+type fakeSubResourceClient struct {
+	client      *Client
+	subResource string
 }
 
-func (sw *fakeStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+var _ client.SubResourceClient = &fakeSubResourceClient{}
+
+func (sw *fakeSubResourceClient) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
+	panic("fakeSubResourceClient does not support get")
+}
+
+func (sw *fakeSubResourceClient) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+	panic("fakeSubResourceWriter does not support create")
+}
+
+func (sw *fakeSubResourceClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 	data, err := patch.Data(obj)
 	if err != nil { // untested section
 		return err
 	}
-	action := testing.NewPatchSubresourceAction(schema.GroupVersionResource{}, obj.GetNamespace(), obj.GetName(), patch.Type(), data, "status")
+	action := testing.NewPatchSubresourceAction(schema.GroupVersionResource{}, obj.GetNamespace(), obj.GetName(), patch.Type(), data, sw.subResource)
 	return sw.client.invokeAction(action, obj)
 }
 
-func (sw *fakeStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	action := testing.NewUpdateSubresourceAction(schema.GroupVersionResource{}, "status", obj.GetNamespace(), obj)
+func (sw *fakeSubResourceClient) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	action := testing.NewUpdateSubresourceAction(schema.GroupVersionResource{}, sw.subResource, obj.GetNamespace(), obj)
 	return sw.client.invokeAction(action, obj)
 }
 
