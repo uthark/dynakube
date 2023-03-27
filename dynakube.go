@@ -29,7 +29,11 @@ func NewDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *Client
 	return NewClient(scheme, objects...)
 }
 func NewClient(scheme *runtime.Scheme, objects ...runtime.Object) *Client {
-	dynamicClient := fake.NewSimpleDynamicClient(scheme, objects...)
+	// https://github.com/kubernetes/kubernetes/commit/418fa71b6b1d1fba930daaba1f8ecf55070b4bdf introduced a change to
+	// always add unstructured types to the schema created instead of the actual types which then breaks converting
+	// from the concrete types to unstructured
+	// workaround this by calling the underlying custom list kinds method
+	dynamicClient := fake.NewSimpleDynamicClientWithCustomListKinds(scheme, nil, objects...)
 
 	return &Client{
 		client: dynamicClient,
@@ -112,7 +116,36 @@ func (c *Client) Get(ctx context.Context, key client.ObjectKey, obj client.Objec
 
 // List retrieves list of objects for a given namespace and list options.
 func (c *Client) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	panic("implement me")
+	listOpts := client.ListOptions{}
+	listOpts.ApplyOptions(opts)
+	metav1ListOpts := listOpts.AsListOptions()
+	if metav1ListOpts == nil {
+		return fmt.Errorf("unable to convert %T to %T", listOpts, metav1ListOpts)
+	}
+
+	gvk, _ := apiutil.GVKForObject(list, c.scheme)
+	gvk.Kind = gvk.Kind[:len(gvk.Kind)-4] /*base library appends List*/
+	gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+
+	// TODO: support non-namespaced resources
+	var action testing.Action
+	if listOpts.Namespace == "" {
+		action = testing.NewRootListAction(gvr, gvk, *metav1ListOpts)
+	} else {
+		action = testing.NewListAction(gvr, gvk, listOpts.Namespace, *metav1ListOpts)
+	}
+
+	o, err := c.client.Invokes(action, &metav1.Status{Status: "dynamic list fail"})
+	if err != nil { // untested section
+		return err
+	}
+	j, err := json.Marshal(o)
+	if err != nil { // untested section
+		return err
+	}
+	decoder := scheme.Codecs.UniversalDecoder()
+	_, _, err = decoder.Decode(j, nil, list)
+	return err
 }
 
 // Create saves the object obj.
