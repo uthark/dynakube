@@ -2,8 +2,9 @@ package dynakube
 
 import (
 	"context"
-	v1 "k8s.io/api/apps/v1"
 	"testing"
+
+	v1 "k8s.io/api/apps/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -76,10 +77,15 @@ var _ = Describe("Dynakube", func() {
 	})
 
 	Context("List", func() {
-		It("Not implemented", func() {
+		It("works", func() {
 			pod := stubPod()
 			c = NewClient(customScheme, pod)
-			Expect(func() { c.List(context.Background(), &corev1.PodList{}) }).Should(Panic())
+
+			var list corev1.PodList
+			err := c.List(context.Background(), &list)
+			Expect(err).To(BeNil())
+			Expect(list.Items).To(HaveLen(1))
+			Expect(list.Items[0].ObjectMeta).To(Equal(pod.ObjectMeta))
 		})
 
 	})
