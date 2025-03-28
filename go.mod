@@ -1,6 +1,6 @@
 module github.com/uthark/dynakube
 
-go 1.18
+go 1.24
 
 require (
 	github.com/onsi/ginkgo v1.16.5
