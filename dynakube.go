@@ -24,6 +24,8 @@ type Client struct {
 	scheme *runtime.Scheme
 }
 
+var _ = client.Client(&Client{}) // ensure interface matches
+
 // DEPRECATED. Use NewClient
 func NewDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *Client {
 	return NewClient(scheme, objects...)
@@ -197,6 +199,21 @@ func (c *Client) AddObjects(objs ...runtime.Object) error {
 
 	}
 	return nil
+}
+
+// TODO: just a hack
+func (c *Client) GroupVersionKindFor(object runtime.Object) (schema.GroupVersionKind, error) {
+	gvk, err := apiutil.GVKForObject(object, c.scheme)
+	if err != nil {
+		// untested section
+		return schema.GroupVersionKind{}, err
+	}
+	return gvk, nil
+}
+
+// TODO: just a hack
+func (c *Client) IsObjectNamespaced(obj runtime.Object) (bool, error) {
+	return true, nil
 }
 
 func getGVRFromObject(obj runtime.Object, scheme *runtime.Scheme) (schema.GroupVersionResource, error) {
